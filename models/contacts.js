@@ -9,8 +9,6 @@ function listContacts() {
     .readFile(contactsPath)
     .then((data) => {
       const contacts = JSON.parse(data);
-      console.log("List of contacts: ");
-      console.table(contacts);
       return contacts;
     })
     .catch((err) => console.log(err.message));
@@ -24,14 +22,11 @@ function getContactById(contactId) {
       const contacts = JSON.parse(data);
       const contact = contacts.find((contact) => {
         if (contact.id === contactId) {
-          console.log(`Get contact by ID ${contactId}:`);
-          console.table(contact);
           return contact;
         }
       });
 
       if (contact == null) {
-        console.log(`Contact with ID "${contactId}" not found!`);
         return;
       }
 
@@ -51,12 +46,8 @@ function removeContact(contactId) {
       );
 
       if (newContacts.length === contacts.length) {
-        console.log(`Contact with ID "${contactId}" not found!`);
         return contacts;
       }
-
-      console.log("Contact deleted successfully! New list of contacts: ");
-      console.table(newContacts);
 
       fs.writeFile(contactsPath, JSON.stringify(newContacts), (error) => {
         if (error) {
@@ -84,9 +75,6 @@ function addContact(name, email, phone) {
 
       contacts.push(contact);
 
-      console.log("Contacts added successfully! New lists of contacts: ");
-      console.table(contacts);
-
       fs.writeFile(contactsPath, JSON.stringify(contacts), (error) => {
         if (error) {
           return console.log(error);
@@ -107,14 +95,11 @@ function updateContact(contactId, name, email, phone) {
         contact.name = name ? name : contact.name;
         contact.email = email ? email : contact.email;
         contact.phone = phone ? phone : contact.phone;
-        console.log(`Contact with ID ${contactId} updated!`);
-        console.table(contacts);
         return contact;
       }
     });
 
     if (contact == null) {
-      console.log(`Contact with ID "${contactId}" not found!`);
       return;
     }
 
