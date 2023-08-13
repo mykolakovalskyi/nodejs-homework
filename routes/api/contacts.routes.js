@@ -175,10 +175,28 @@ router.patch("/:contactId/favorite", async (req, res, next) => {
     const { contactId } = req.params;
     console.log(contactId);
     const { favorite } = req.body;
+
+    if (!favorite) {
+      res.status(400).json({
+        status: "error",
+        code: 400,
+        message: "Missing field favorite",
+      });
+    }
+
     const updatedContact = await contactsManager.updateContactStatus(
       contactId,
       favorite
     );
+
+    if (!updatedContact) {
+      res.status(404).json({
+        status: "not-found",
+        code: 404,
+        message: "Not found",
+      });
+    }
+
     res.json({
       status: "success",
       code: 200,
