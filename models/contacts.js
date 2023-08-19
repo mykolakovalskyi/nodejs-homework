@@ -1,7 +1,7 @@
 const Contact = require("./contact.model");
 
-function listContacts() {
-  return Contact.find();
+function listContacts(query) {
+  return Contact.find(query);
 }
 
 function getContactById(contactId) {

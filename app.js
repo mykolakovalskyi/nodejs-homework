@@ -33,9 +33,6 @@ app.use((err, req, res, next) => {
 connection
   .then(() => {
     console.log("Database connection successful");
-    app.listen(4000, () => {
-      console.log("App listens on port 4000");
-    });
   })
   .catch((err) => {
     console.error(`Error while establishing connection: [${err}]`);

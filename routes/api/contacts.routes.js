@@ -4,18 +4,28 @@ const router = express.Router();
 const contactsManager = require("../../models/contacts");
 
 const Joi = require("joi");
-const schema = Joi.object({
+const createSchema = Joi.object({
+  name: Joi.string().min(3).max(30).required(),
+  email: Joi.string()
+    .email({
+      minDomainSegments: 2,
+    })
+    .required(),
+  phone: Joi.string().min(9).max(14).required(),
+});
+
+const updateSchema = Joi.object({
   name: Joi.string().min(3).max(30),
   email: Joi.string().email({
     minDomainSegments: 2,
   }),
   phone: Joi.string().min(9).max(14),
-});
+}).or("name", "email", "phone");
 
 router.get("/", async (req, res, next) => {
   try {
     const { query } = req;
-    const results = await contactsManager.listContacts();
+    const results = await contactsManager.listContacts(query);
     res.json({
       status: "success",
       code: 200,
@@ -61,22 +71,13 @@ router.get("/:contactId", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
-    const { error, value } = schema.validate(req.body);
-    const { name, email, phone } = value;
+    const { error, value } = createSchema.validate(req.body);
 
     if (error) {
       res.status(400).json({
         status: "error",
         code: 400,
         message: error.message,
-      });
-    }
-
-    if (!name || !email || !phone) {
-      res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Missing field",
       });
     }
 
@@ -124,23 +125,14 @@ router.delete("/:contactId", async (req, res, next) => {
 
 router.put("/:contactId", async (req, res, next) => {
   try {
-    const { error, value } = schema.validate(req.body);
+    const { error, value } = updateSchema.validate(req.body);
     const { contactId } = req.params;
-    const { name, email, phone } = value;
 
     if (error) {
       res.status(400).json({
         status: "error",
         code: 400,
         message: error.message,
-      });
-    }
-
-    if (!name && !email && !phone) {
-      res.status(400).json({
-        status: "error",
-        code: 400,
-        message: "Missing field",
       });
     }
 
