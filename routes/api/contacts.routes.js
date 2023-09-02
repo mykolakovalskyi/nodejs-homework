@@ -1,7 +1,9 @@
 const express = require("express");
 
 const router = express.Router();
-const contactsManager = require("../../models/contacts");
+const contactsManager = require("../../controllers/contacts.controller");
+
+const auth = require("../../middlewares/auth");
 
 const Joi = require("joi");
 const createSchema = Joi.object({
@@ -22,10 +24,13 @@ const updateSchema = Joi.object({
   phone: Joi.string().min(9).max(14),
 }).or("name", "email", "phone");
 
-router.get("/", async (req, res, next) => {
+router.get("/", auth, async (req, res, next) => {
   try {
-    const { query } = req;
-    const results = await contactsManager.listContacts(query);
+    const { query, user } = req;
+    const results = await contactsManager.listContacts({
+      ...query,
+      owner: user._id,
+    });
     res.json({
       status: "success",
       code: 200,
@@ -39,11 +44,15 @@ router.get("/", async (req, res, next) => {
   }
 });
 
-router.get("/:contactId", async (req, res, next) => {
+router.get("/:contactId", auth, async (req, res, next) => {
   try {
-    const { contactId } = req.params;
+    const { params, user } = req;
+    const { contactId } = params;
 
-    const contactToFind = await contactsManager.getContactById(contactId);
+    const contactToFind = await contactsManager.getContactById(
+      contactId,
+      user._id
+    );
 
     if (!contactToFind) {
       res.status(404).json({
@@ -69,9 +78,11 @@ router.get("/:contactId", async (req, res, next) => {
   }
 });
 
-router.post("/", async (req, res, next) => {
+router.post("/", auth, async (req, res, next) => {
   try {
-    const { error, value } = createSchema.validate(req.body);
+    const { body, user } = req;
+
+    const { error, value } = createSchema.validate(body);
 
     if (error) {
       res.status(400).json({
@@ -81,7 +92,10 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const newContact = await contactsManager.addContact(value);
+    const newContact = await contactsManager.addContact({
+      ...value,
+      owner: user._id,
+    });
 
     res.json({
       status: "success",
@@ -96,13 +110,17 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.delete("/:contactId", async (req, res, next) => {
+router.delete("/:contactId", auth, async (req, res, next) => {
   try {
     const { contactId } = req.params;
+    const { user } = req;
 
     const contacts = await contactsManager.listContacts();
 
-    const newContacts = await contactsManager.removeContact(contactId);
+    const newContacts = await contactsManager.removeContact(
+      contactId,
+      user._id
+    );
 
     if (newContacts.length === contacts.length) {
       res.status(404).json({
@@ -123,9 +141,11 @@ router.delete("/:contactId", async (req, res, next) => {
   }
 });
 
-router.put("/:contactId", async (req, res, next) => {
+router.put("/:contactId", auth, async (req, res, next) => {
   try {
-    const { error, value } = updateSchema.validate(req.body);
+    const { body, user } = req;
+
+    const { error, value } = updateSchema.validate(body);
     const { contactId } = req.params;
 
     if (error) {
@@ -138,6 +158,7 @@ router.put("/:contactId", async (req, res, next) => {
 
     const updatedContact = await contactsManager.updateContact(
       contactId,
+      user._id,
       value
     );
 
@@ -162,11 +183,11 @@ router.put("/:contactId", async (req, res, next) => {
   }
 });
 
-router.patch("/:contactId/favorite", async (req, res, next) => {
+router.patch("/:contactId/favorite", auth, async (req, res, next) => {
   try {
-    const { contactId } = req.params;
-    console.log(contactId);
-    const { favorite } = req.body;
+    const { body, params, user } = req;
+    const { contactId } = params;
+    const { favorite } = body;
 
     if (!favorite) {
       res.status(400).json({
@@ -178,6 +199,7 @@ router.patch("/:contactId/favorite", async (req, res, next) => {
 
     const updatedContact = await contactsManager.updateContactStatus(
       contactId,
+      user._id,
       favorite
     );
 
