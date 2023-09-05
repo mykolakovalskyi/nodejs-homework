@@ -4,6 +4,20 @@ const User = require("../../models/user.model");
 const jwt = require("jsonwebtoken");
 const Joi = require("joi");
 const auth = require("../../middlewares/auth");
+const upload = require("../../middlewares/upload");
+const gravatar = require("gravatar");
+const path = require("path");
+const fs = require("fs/promises");
+const Jimp = require("jimp");
+const { error } = require("console");
+
+const avatarsDirectory = path.join(
+  __dirname,
+  "../",
+  "../",
+  "public",
+  "avatars"
+);
 
 const emailRegex = /[a-z0-9]+@[a-z]+\.[a-z]{2,3}/;
 
@@ -92,7 +106,10 @@ router.post("/signup", async (req, res, next) => {
         data: "Conflict",
       });
     }
-    const newUser = new User({ email, subscription });
+
+    const avatarURL = gravatar.url(email);
+
+    const newUser = new User({ email, subscription, avatarURL });
     newUser.setPassword(password);
     await newUser.save();
     return res.status(201).json({
@@ -145,5 +162,48 @@ router.patch("/subscription", auth, async (req, res, next) => {
     next(error);
   }
 });
+
+router.patch(
+  "/avatars",
+  auth,
+  upload.single("avatar"),
+  async (req, res, next) => {
+    try {
+      const { _id } = req.user;
+      const { path: temporaryName, originalname } = req.file;
+      const filename = `${_id}_${originalname}`;
+      const newName = path.join(avatarsDirectory, filename);
+
+      const rawAvatar = await Jimp.read(temporaryName);
+      rawAvatar.resize(250, 250);
+      await rawAvatar.writeAsync(temporaryName);
+
+      await fs.rename(temporaryName, newName).catch((err) => {
+        fs.unlink(temporaryName)
+          .then(() => {
+            next(err);
+          })
+          .catch((error) => {
+            next(error);
+          });
+      });
+      const avatarURL = path.join("avatars", filename);
+      await User.findByIdAndUpdate(_id, { avatarURL });
+
+      res.json({
+        status: "success",
+        code: 200,
+        data: {
+          message: "Avatar updated",
+          user: {
+            avatarURL,
+          },
+        },
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+);
 
 module.exports = router;
