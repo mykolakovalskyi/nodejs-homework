@@ -137,7 +137,7 @@ router.post("/signup", async (req, res, next) => {
     await newUser.save();
 
     const verifyEmail = {
-      from: "kovmuk01@gmail.com",
+      from: process.env.VERIFY_MAIL,
       to: email,
       subject: "Verify email.",
       html: `
@@ -281,7 +281,7 @@ router.post("/verify", async (req, res, next) => {
     }
 
     const verifyEmail = {
-      from: "kovmuk01@gmail.com",
+      from: process.env.VERIFY_MAIL,
       to: email,
       subject: "Verify email.",
       html: `
