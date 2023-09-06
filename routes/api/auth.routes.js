@@ -9,7 +9,9 @@ const gravatar = require("gravatar");
 const path = require("path");
 const fs = require("fs/promises");
 const Jimp = require("jimp");
-const { error } = require("console");
+const { v4: uuidv4 } = require("uuid");
+const sgMail = require("@sendgrid/mail");
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 const avatarsDirectory = path.join(
   __dirname,
@@ -38,6 +40,10 @@ const updateSubscriptionSchema = Joi.object({
   subscription: Joi.string().valid("starter", "pro", "business"),
 });
 
+const emailSchema = Joi.object({
+  email: Joi.string().pattern(emailRegex).required(),
+});
+
 router.post("/login", async (req, res, next) => {
   try {
     const { error } = logInSchema.validate(req.body);
@@ -54,6 +60,14 @@ router.post("/login", async (req, res, next) => {
         code: 401,
         message: "Incorrect login or password",
         data: "Unauthorized",
+      });
+    }
+
+    if (!user.verify) {
+      return res.status(401).json({
+        status: "error",
+        code: 401,
+        message: "Email not verified.",
       });
     }
 
@@ -80,6 +94,7 @@ router.post("/login", async (req, res, next) => {
     next(error);
   }
 });
+
 router.post("/logout", auth, async (req, res, next) => {
   try {
     const { _id } = req.user;
@@ -89,6 +104,7 @@ router.post("/logout", auth, async (req, res, next) => {
     next(error);
   }
 });
+
 router.post("/signup", async (req, res, next) => {
   try {
     const { error } = registerSchema.validate(req.body);
@@ -109,9 +125,27 @@ router.post("/signup", async (req, res, next) => {
 
     const avatarURL = gravatar.url(email);
 
-    const newUser = new User({ email, subscription, avatarURL });
+    const verificationToken = uuidv4();
+
+    const newUser = new User({
+      email,
+      subscription,
+      avatarURL,
+      verificationToken,
+    });
     newUser.setPassword(password);
     await newUser.save();
+
+    const verifyEmail = {
+      from: process.env.VERIFY_MAIL,
+      to: email,
+      subject: "Verify email.",
+      html: `
+      <p>Your validation token: ${verificationToken}. Use it to validate your email or just click link below</p><br/>
+      <a target="_blank" href="${process.env.BASE_URL}/users/verify/${verificationToken}">Click verify email.</a>`,
+    };
+    await sgMail.send(verifyEmail);
+
     return res.status(201).json({
       status: "success",
       code: 201,
@@ -205,5 +239,61 @@ router.patch(
     }
   }
 );
+
+router.get("/verify/:verificationToken", async (req, res, next) => {
+  try {
+    const { verificationToken } = req.params;
+    console.log(verificationToken);
+    const user = await User.findOne({ verificationToken });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    await User.findByIdAndUpdate(user._id, {
+      verify: true,
+      verificationToken: null,
+    });
+
+    res.json({
+      status: "success",
+      code: 200,
+      message: "Verification successful",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/verify", async (req, res, next) => {
+  try {
+    const { error, value } = emailSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+    const { email } = value;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    if (user.verify) {
+      return res
+        .status(400)
+        .json({ message: "Verification has already been passed" });
+    }
+
+    const verifyEmail = {
+      from: process.env.VERIFY_MAIL,
+      to: email,
+      subject: "Verify email.",
+      html: `
+      <p>Your validation token: ${verificationToken}. Use it to validate your email or just click link below</p><br/>
+      <a target="_blank" href="${process.env.BASE_URL}/users/verify/${user.verificationToken}">Click verify email.</a>`,
+    };
+    await sgMail.send(verifyEmail);
+
+    return res.json({ code: 200, message: "Verification email sent" });
+  } catch (error) {
+    next(error);
+  }
+});
 
 module.exports = router;
